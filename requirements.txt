@@ -1,0 +1,7 @@
+spacy>=3
+pythainlp>=4.0
+pythainlp
+transformers
+torch
+spacy-pythainlp
+scikit-learn

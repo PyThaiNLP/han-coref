@@ -1,0 +1,3 @@
+[submodule "fastcoref"]
+	path = fastcoref
+	url = https://github.com/shon-otmazgin/fastcoref.git

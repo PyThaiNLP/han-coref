@@ -1,0 +1,222 @@
+diff --git a/fastcoref/trainer.py b/fastcoref/trainer.py
+index 052b247..f689da1 100644
+--- a/fastcoref/trainer.py
++++ b/fastcoref/trainer.py
+@@ -31,6 +31,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - \t %(message)s',
+ class TrainingArgs:
+     model_name_or_path: str
+     output_dir: str
++    blank:str=None
+     overwrite_output_dir: bool = False
+     learning_rate: float = 1e-5
+     head_learning_rate: float = 3e-4
+@@ -85,14 +86,16 @@ def _load_f_coref_model(args):
+ 
+ 
+ class CorefTrainer:
+-    def __init__(self, args: TrainingArgs, train_file, dev_file=None, test_file=None):
++    def __init__(self, args: TrainingArgs, train_file, blank=None,hf=None, dev_file=None, test_file=None,nlp=None):
+         transformers.logging.set_verbosity_error()
+         self.args = args
+-        wandb.init(project=self.args.output_dir, config=self.args)
++        # wandb.init(project=self.args.output_dir, config=self.args)
+ 
+         self._set_device()
+-
+-        self.nlp = spacy.load("en_core_web_sm", exclude=["tagger", "parser", "lemmatizer", "ner", "textcat"])
++        if nlp==None:
++            self.nlp = spacy.load("/workspace/lab/Thai_Coreference_Resolution/data/spacy.word2vec.model/", exclude=["tagger", "parser", "lemmatizer", "ner", "textcat"])
++        else:
++            self.nlp=nlp
+         self.model, self.tokenizer = _load_f_coref_model(self.args)
+         self.model.to(self.device)
+ 
+@@ -118,6 +121,9 @@ class CorefTrainer:
+         dataset = coref_dataset.create(
+             file=file, tokenizer=self.tokenizer, nlp=self.nlp
+         )
++        #print(dataset)
++        #dataset=dataset.filter(lambda example: example['error']!=True)
++        print(dataset)
+         sampler = DynamicBatchSampler(
+             dataset=dataset,
+             collator=self.collator,
+@@ -182,56 +188,55 @@ class CorefTrainer:
+ 
+         global_step, tr_loss, logging_loss = 0, 0.0, 0.0
+         best_f1, best_global_step = -1, -1
++        len_train_batches = len(train_batches)
+ 
+         train_iterator = tqdm(range(int(self.args.epochs)), desc="Epoch")
+         for _ in train_iterator:
+             epoch_iterator = tqdm(train_batches, desc="Iteration")
+             for step, batch in enumerate(epoch_iterator):
+-                batch['input_ids'] = torch.tensor(batch['input_ids'], device=self.device)
+-                batch['attention_mask'] = torch.tensor(batch['attention_mask'], device=self.device)
+-                batch['gold_clusters'] = torch.tensor(batch['gold_clusters'], device=self.device)
+-                if 'leftovers' in batch:
+-                    batch['leftovers']['input_ids'] = torch.tensor(batch['leftovers']['input_ids'], device=self.device)
+-                    batch['leftovers']['attention_mask'] = torch.tensor(batch['leftovers']['attention_mask'],
+-                                                                        device=self.device)
+-
+-                self.model.zero_grad()
+-                self.model.train()
+-
+-                with torch.cuda.amp.autocast():
+-                    outputs = self.model(batch, gold_clusters=batch['gold_clusters'], return_all_outputs=False)
+-
+-                loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
+-
+-                tr_loss += loss.item()
+-                scaler.scale(loss).backward()
+-
+-                scaler.step(optimizer)
+-                scheduler.step()  # Update learning rate schedule
+-                scaler.update()  # Updates the scale for next iteration
+-                global_step += 1
+-
+-                # Log metrics
+-                if global_step % self.args.logging_steps == 0:
+-                    loss = (tr_loss - logging_loss) / self.args.logging_steps
+-                    logger.info(f"loss step {global_step}: {loss}")
+-                    wandb.log({'loss': loss}, step=global_step)
+-                    logging_loss = tr_loss
+-
+-                # Evaluation
+-                if self.dev_sampler is not None and global_step % self.args.eval_steps == 0:
+-                    results = self.evaluate(prefix=f'step_{global_step}', test=False)
+-                    wandb.log(results, step=global_step)
+-
+-                    f1 = results["f1"]
+-                    if f1 > best_f1:
+-                        best_f1, best_global_step = f1, global_step
+-                        wandb.run.summary["best_f1"] = best_f1
+-
+-                        # Save model
+-                        output_dir = os.path.join(self.args.output_dir, f'model')
+-                        save_all(tokenizer=self.tokenizer, model=self.model, output_dir=output_dir)
+-                    logger.info(f"best f1 is {best_f1} on global step {best_global_step}")
++                try:
++                    batch['input_ids'] = torch.tensor(batch['input_ids'], device=self.device)
++                    batch['attention_mask'] = torch.tensor(batch['attention_mask'], device=self.device)
++                    batch['gold_clusters'] = torch.tensor(batch['gold_clusters'], device=self.device)
++                    if 'leftovers' in batch:
++                        batch['leftovers']['input_ids'] = torch.tensor(batch['leftovers']['input_ids'], device=self.device)
++                        batch['leftovers']['attention_mask'] = torch.tensor(batch['leftovers']['attention_mask'],device=self.device)
++
++                    self.model.zero_grad()
++                    self.model.train()
++
++                    with torch.cuda.amp.autocast():
++                        outputs = self.model(batch, gold_clusters=batch['gold_clusters'], return_all_outputs=False)
++                    loss = outputs[0]  # model outputs are always tuple in transformers (see doc)
++
++                    tr_loss += loss.item()
++                    scaler.scale(loss).backward()
++
++                    scaler.step(optimizer)
++                    scheduler.step()  # Update learning rate schedule
++                    scaler.update()  # Updates the scale for next iteration
++                    global_step += 1
++
++                    # Log metrics
++                    if global_step % self.args.logging_steps == 0:
++                        loss = (tr_loss - logging_loss) / self.args.logging_steps
++                        logger.info(f"loss step {global_step}: {loss}")
++                        # wandb.log({'loss': loss}, step=global_step)
++                        logging_loss = tr_loss
++                    # Evaluation
++                    if self.dev_sampler is not None and global_step % len_train_batches == 0: # self.args.eval_steps
++                        results = self.evaluate(prefix=f'step_{global_step}', test=False)
++                        # wandb.log(results, step=global_step)
++                        f1 = results["f1"]
++                        if f1 > best_f1:
++                            best_f1, best_global_step = f1, global_step
++                            # wandb.run.summary["best_f1"] = best_f1
++                            # Save model
++                            output_dir = os.path.join(self.args.output_dir, f'model')
++                            save_all(tokenizer=self.tokenizer, model=self.model, output_dir=output_dir)
++                        logger.info(f"best f1 is {best_f1} on global step {best_global_step}")
++                except Exception as e:
++                    print(e)
+ 
+     def evaluate(self, test=False, prefix=''):
+         if test:
+@@ -266,24 +271,26 @@ class CorefTrainer:
+                 with torch.no_grad():
+                     outputs = self.model(batch, gold_clusters=gold_clusters, return_all_outputs=True)
+ 
+-                outputs_np = tuple(tensor.cpu().numpy() for tensor in outputs)
+-
+-                gold_clusters = gold_clusters.cpu().numpy()
+-                loss, span_starts, span_ends, mention_logits, coref_logits = outputs_np
+-                metrics_dict['loss'] += loss.item()
+-
+-                doc_indices, mention_to_antecedent = create_mention_to_antecedent(span_starts, span_ends, coref_logits)
+-
+-                for i, doc_key in enumerate(doc_keys):
+-                    doc_mention_to_antecedent = mention_to_antecedent[np.nonzero(doc_indices == i)]
+-                    predicted_clusters = create_clusters(doc_mention_to_antecedent)
+-
+-                    doc_to_prediction[doc_key] = predicted_clusters
+-                    doc_to_tokens[doc_key] = tokens[i]
+-                    doc_to_subtoken_map[doc_key] = subtoken_map[i]
+-                    doc_to_new_word_map[doc_key] = new_token_map[i]
++                outputs_np = tuple(tensor.detach().cpu().numpy() for tensor in outputs)
++                #print(gold_clusters)
++                try:
++                    gold_clusters = gold_clusters.detach().cpu().numpy()
++                    loss, span_starts, span_ends, mention_logits, coref_logits = outputs_np
++                    metrics_dict['loss'] += loss.item()
++                    doc_indices, mention_to_antecedent = create_mention_to_antecedent(span_starts, span_ends, coref_logits)
++                    for i, doc_key in enumerate(doc_keys):
++                        doc_mention_to_antecedent = mention_to_antecedent[np.nonzero(doc_indices == i)]
++                        predicted_clusters = create_clusters(doc_mention_to_antecedent)
++                        
++                        doc_to_prediction[doc_key] = predicted_clusters
++                        doc_to_tokens[doc_key] = tokens[i]
++                        doc_to_subtoken_map[doc_key] = subtoken_map[i]
++                        doc_to_new_word_map[doc_key] = new_token_map[i]
++                        update_metrics(metrics_dict, span_starts[i], span_ends[i], gold_clusters[i], predicted_clusters)
++                except Exception as e:
++                    print(batch)
++                    print(e)
+ 
+-                    update_metrics(metrics_dict, span_starts[i], span_ends[i], gold_clusters[i], predicted_clusters)
+ 
+                 progress_bar.update(n=len(doc_keys))
+ 
+diff --git a/fastcoref/utilities/coref_dataset.py b/fastcoref/utilities/coref_dataset.py
+index b006c70..03c8383 100644
+--- a/fastcoref/utilities/coref_dataset.py
++++ b/fastcoref/utilities/coref_dataset.py
+@@ -64,21 +64,23 @@ def _tokenize(tokenizer, tokens, clusters, speakers):
+ def encode(example, tokenizer, nlp):
+     if 'tokens' in example and example['tokens']:
+         pass
++    elif example['clusters']==[] and 'text' in example and example['text']:
++        example['clusters'] = example['clusters']
++        example['error'] = True
+     elif 'text' in example and example['text']:
+         clusters = example['clusters']
+         spacy_doc = nlp(example['text'])
+         example['tokens'] = [tok.text for tok in spacy_doc]
+-
+-        new_clusters = [[(spacy_doc.char_span(start, end).start,
+-                          spacy_doc.char_span(start, end).end - 1)
+-                         for start, end in cluster] for cluster in clusters]
+-        # verify alignment
++        #print("text: "+example['text'])
++        new_clusters = [[(spacy_doc.char_span(start, end).start,spacy_doc.char_span(start, end).end - 1) for start, end in cluster] for cluster in clusters]
++        #verify alignment
+         for cluster, new_cluster in zip(clusters, new_clusters):
+             for (s1, e1), (s2, e2) in zip(cluster, new_cluster):
++                #e1+=1
+                 mention = [tok.text for tok in nlp(example['text'][s1:e1])]
+                 assert mention == example['tokens'][s2:e2 + 1], (mention, example['tokens'][s2:e2 + 1])
+-
+         example['clusters'] = new_clusters
++        example['error'] = False
+     else:
+         raise ValueError(f"Example is empty: {example}")
+ 
