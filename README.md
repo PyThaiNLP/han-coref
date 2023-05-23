@@ -12,7 +12,7 @@ This project is developed by 🪿 Wannaphong Phatthiyaphaibun.
 - The Dataset use [Creative Commons Attribution 3.0 Unported License](https://creativecommons.org/licenses/by/3.0/).
 
 
-This project is a part of [🪿 PyThaiNLP prject](https://github.com/PyThaiNLP/).
+This project is a part of [🪿 PyThaiNLP project](https://github.com/PyThaiNLP/).
 
 
 We build Thai NLP.
