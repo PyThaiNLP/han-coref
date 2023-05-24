@@ -6,9 +6,12 @@ This project is developed by 🪿 Wannaphong Phatthiyaphaibun.
 
 Demo: [Google Colab](https://colab.research.google.com/github/PyThaiNLP/han-coref/blob/main/demo.ipynb)
 
+**New!!! Online Demo**: [Huggingface Spaces](https://huggingface.co/spaces/pythainlp/Han-Coref)
+
 
 **Current 🪿 Han-Coref version**: 1.0
 
+**Links**
 - The technical paper: [Zenodo](https://zenodo.org/record/7965488)
 - GitHub: [pythainlp/han-coref](https://github.com/pythainlp/han-coref)
 - Model: [pythainlp/han-coref-v1.0](https://huggingface.co/pythainlp/han-coref-v1.0)
