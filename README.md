@@ -7,6 +7,7 @@ This project is developed by 🪿 Wannaphong Phatthiyaphaibun.
 
 **Current 🪿 Han-Coref version**: 1.0
 
+- GitHub: [pythainlp/han-coref](https://github.com/pythainlp/han-coref)
 - Model: [pythainlp/han-coref-v1.0](https://huggingface.co/pythainlp/han-coref-v1.0)
 - Dataset: [pythainlp/han-corf-dataset-v1.0](https://huggingface.co/datasets/pythainlp/han-corf-dataset-v1.0)
 
