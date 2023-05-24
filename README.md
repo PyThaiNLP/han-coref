@@ -4,7 +4,7 @@ This project want to create Thai Coreference resolution system.
 
 This project is developed by 🪿 Wannaphong Phatthiyaphaibun.
 
-[Google Colab](https://colab.research.google.com/github/PyThaiNLP/han-coref/blob/main/usage.ipynb)
+[Google Colab](https://colab.research.google.com/github/PyThaiNLP/han-coref/blob/main/demo.ipynb)
 
 
 **Current 🪿 Han-Coref version**: 1.0
